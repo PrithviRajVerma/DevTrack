@@ -31,17 +31,20 @@ public class IssueService {
     private final ProjectCounterRepository projectCounterRepository;
     private final ProjectService projectService;
     private final UserService userService;
+    private final com.devtrack.activity.service.ActivityEventService activityEventService;
 
     public IssueService(
             IssueRepository issueRepository,
             ProjectCounterRepository projectCounterRepository,
             ProjectService projectService,
-            UserService userService
+            UserService userService,
+            com.devtrack.activity.service.ActivityEventService activityEventService
     ) {
         this.issueRepository = issueRepository;
         this.projectCounterRepository = projectCounterRepository;
         this.projectService = projectService;
         this.userService = userService;
+        this.activityEventService = activityEventService;
     }
 
     private User getCurrentUser() {
@@ -79,6 +82,15 @@ public class IssueService {
         );
 
         Issue savedIssue = issueRepository.save(issue);
+
+        // Record audit activity
+        activityEventService.recordEvent(
+                savedIssue,
+                currentUser,
+                com.devtrack.activity.entity.ActivityEventType.ISSUE_CREATED,
+                "Created issue " + savedIssue.getKey() + ": " + savedIssue.getTitle()
+        );
+
         return IssueResponse.fromEntity(savedIssue);
     }
 
@@ -134,10 +146,22 @@ public class IssueService {
         if (request.getType() != null) {
             issue.setType(request.getType());
         }
-        if (request.getStatus() != null) {
+        if (request.getStatus() != null && request.getStatus() != issue.getStatus()) {
+            activityEventService.recordEvent(
+                    issue,
+                    currentUser,
+                    com.devtrack.activity.entity.ActivityEventType.STATUS_CHANGED,
+                    "Changed status from " + issue.getStatus() + " to " + request.getStatus()
+            );
             issue.setStatus(request.getStatus());
         }
-        if (request.getPriority() != null) {
+        if (request.getPriority() != null && request.getPriority() != issue.getPriority()) {
+            activityEventService.recordEvent(
+                    issue,
+                    currentUser,
+                    com.devtrack.activity.entity.ActivityEventType.PRIORITY_CHANGED,
+                    "Changed priority from " + issue.getPriority() + " to " + request.getPriority()
+            );
             issue.setPriority(request.getPriority());
         }
         if (request.getDueDate() != null) {
@@ -146,10 +170,24 @@ public class IssueService {
 
         if (request.getAssigneeId() != null) {
             if (request.getAssigneeId() == 0) {
-                issue.setAssignee(null); // Unassign
+                if (issue.getAssignee() != null) {
+                    activityEventService.recordEvent(
+                            issue,
+                            currentUser,
+                            com.devtrack.activity.entity.ActivityEventType.ASSIGNEE_CHANGED,
+                            "Removed assignee " + issue.getAssignee().getName()
+                    );
+                    issue.setAssignee(null);
+                }
             } else {
                 User newAssignee = userService.findById(request.getAssigneeId());
                 projectService.requireMembership(projectId, newAssignee.getId());
+                activityEventService.recordEvent(
+                        issue,
+                        currentUser,
+                        com.devtrack.activity.entity.ActivityEventType.ASSIGNEE_CHANGED,
+                        "Assigned issue to " + newAssignee.getName()
+                );
                 issue.setAssignee(newAssignee);
             }
         }
