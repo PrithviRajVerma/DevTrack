@@ -1,19 +1,45 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthContext';
-import { Layers, LogOut, User as UserIcon } from 'lucide-react';
+import { Layers, LogOut, User as UserIcon, LayoutDashboard, FolderGit2 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
+  const location = useLocation();
+
+  const isCurrent = (path: string) => {
+    if (path === '/' && location.pathname === '/') return true;
+    if (path !== '/' && location.pathname.startsWith(path)) return true;
+    return false;
+  };
 
   return (
     <header className="navbar">
       <div className="navbar-container">
-        <div className="navbar-brand">
-          <div className="brand-icon">
-            <Layers size={22} />
-          </div>
-          <span className="brand-title">DevTrack</span>
-          <span className="brand-badge">Milestone 1</span>
+        <div className="navbar-left">
+          <Link to="/" className="navbar-brand">
+            <div className="brand-icon">
+              <Layers size={22} />
+            </div>
+            <span className="brand-title">DevTrack</span>
+          </Link>
+
+          {user && (
+            <nav className="navbar-nav">
+              <Link
+                to="/"
+                className={`nav-link ${isCurrent('/') ? 'nav-link-active' : ''}`}
+              >
+                <LayoutDashboard size={16} /> Dashboard
+              </Link>
+              <Link
+                to="/projects"
+                className={`nav-link ${isCurrent('/projects') ? 'nav-link-active' : ''}`}
+              >
+                <FolderGit2 size={16} /> Projects
+              </Link>
+            </nav>
+          )}
         </div>
 
         {user && (
