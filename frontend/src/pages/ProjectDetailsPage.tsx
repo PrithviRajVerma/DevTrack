@@ -8,6 +8,7 @@ import { Issue, IssuePriority, IssueStatus, IssueType, PageResponse } from '../t
 import { CreateIssueModal } from '../features/issues/CreateIssueModal';
 import { EditIssueModal } from '../features/issues/EditIssueModal';
 import { ManageMembersModal } from '../features/projects/ManageMembersModal';
+import { KanbanBoard } from '../features/board/KanbanBoard';
 import {
   ArrowLeft,
   Plus,
@@ -19,6 +20,8 @@ import {
   Trash2,
   User as UserIcon,
   Clock,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { ApiException } from '../api/client';
 
@@ -45,6 +48,17 @@ export const ProjectDetailsPage: React.FC = () => {
   const [isCreateIssueOpen, setIsCreateIssueOpen] = useState(false);
   const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
   const [editingIssue, setEditingIssue] = useState<Issue | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'board'>('table');
+
+  const handleIssueUpdated = (updated: Issue) => {
+    setIssuesData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        content: prev.content.map((i) => (i.id === updated.id ? updated : i)),
+      };
+    });
+  };
 
   const loadProjectData = useCallback(async () => {
     setIsLoadingProject(true);
@@ -250,6 +264,25 @@ export const ProjectDetailsPage: React.FC = () => {
                 />
                 <Clock size={14} /> Overdue
               </label>
+
+              <div className="flex items-center space-x-1 border border-border rounded-md p-0.5 ml-auto">
+                <button
+                  type="button"
+                  className={`btn-icon p-1.5 rounded ${viewMode === 'table' ? 'bg-primary text-primary-foreground' : 'text-secondary hover:text-foreground'}`}
+                  title="Table view"
+                  onClick={() => setViewMode('table')}
+                >
+                  <List size={16} />
+                </button>
+                <button
+                  type="button"
+                  className={`btn-icon p-1.5 rounded ${viewMode === 'board' ? 'bg-primary text-primary-foreground' : 'text-secondary hover:text-foreground'}`}
+                  title="Kanban Board view"
+                  onClick={() => setViewMode('board')}
+                >
+                  <LayoutGrid size={16} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -273,6 +306,13 @@ export const ProjectDetailsPage: React.FC = () => {
                   <Plus size={14} /> Create Issue
                 </button>
               </div>
+            ) : viewMode === 'board' ? (
+              <KanbanBoard
+                issues={issuesData.content}
+                onIssueClick={(issue) => setEditingIssue(issue)}
+                onIssueUpdated={handleIssueUpdated}
+                onRefreshNeeded={loadIssues}
+              />
             ) : (
               <div className="table-responsive">
                 <table className="issues-table">
@@ -414,6 +454,7 @@ export const ProjectDetailsPage: React.FC = () => {
         isOpen={!!editingIssue}
         issue={editingIssue}
         members={members}
+        isProjectOwner={project.currentUserRole === 'OWNER'}
         onClose={() => setEditingIssue(null)}
         onSuccess={() => {
           setEditingIssue(null);
