@@ -3,7 +3,6 @@ import { ActivityEvent } from '../types/activity';
 
 export const activityApi = {
   getIssueActivity: async (issueId: number): Promise<ActivityEvent[]> => {
-    const response = await apiClient.get<ActivityEvent[]>(`/api/issues/${issueId}/activity`);
-    return response.data;
+    return apiClient<ActivityEvent[]>(`/issues/${issueId}/activity`, { method: 'GET' });
   },
 };

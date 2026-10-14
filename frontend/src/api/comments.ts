@@ -3,21 +3,26 @@ import { Comment, CreateCommentRequest, UpdateCommentRequest } from '../types/co
 
 export const commentsApi = {
   getComments: async (issueId: number): Promise<Comment[]> => {
-    const response = await apiClient.get<Comment[]>(`/api/issues/${issueId}/comments`);
-    return response.data;
+    return apiClient<Comment[]>(`/issues/${issueId}/comments`, { method: 'GET' });
   },
 
   addComment: async (issueId: number, data: CreateCommentRequest): Promise<Comment> => {
-    const response = await apiClient.post<Comment>(`/api/issues/${issueId}/comments`, data);
-    return response.data;
+    return apiClient<Comment>(`/issues/${issueId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   updateComment: async (commentId: number, data: UpdateCommentRequest): Promise<Comment> => {
-    const response = await apiClient.patch<Comment>(`/api/comments/${commentId}`, data);
-    return response.data;
+    return apiClient<Comment>(`/comments/${commentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   },
 
-  deleteComment: async (commentId: number): Promise<void> => {
-    await apiClient.delete(`/api/comments/${commentId}`);
+  deleteComment: async (commentId: number): Promise<{ message: string }> => {
+    return apiClient<{ message: string }>(`/comments/${commentId}`, {
+      method: 'DELETE',
+    });
   },
 };
