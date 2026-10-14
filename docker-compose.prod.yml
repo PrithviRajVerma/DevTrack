@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -40,6 +38,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-postgres_secure_password}
       JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://localhost:80,http://localhost:3000,http://localhost:5173}
     ports:
       - "${BACKEND_PORT:-8080}:8080"

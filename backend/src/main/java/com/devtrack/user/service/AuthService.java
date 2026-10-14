@@ -32,6 +32,9 @@ public class AuthService {
     @Value("${devtrack.jwt.expiration-ms:86400000}")
     private long jwtExpirationMs;
 
+    @Value("${devtrack.jwt.cookie-secure:false}")
+    private boolean cookieSecure;
+
     public AuthService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
@@ -92,7 +95,7 @@ public class AuthService {
     public ResponseCookie createAuthCookie(String token) {
         return ResponseCookie.from(cookieName, token)
                 .httpOnly(true)
-                .secure(false) // Set to true in HTTPS production
+                .secure(cookieSecure)
                 .sameSite("Lax")
                 .path("/")
                 .maxAge(Duration.ofMillis(jwtExpirationMs))
@@ -102,7 +105,7 @@ public class AuthService {
     public ResponseCookie createCleanCookie() {
         return ResponseCookie.from(cookieName, "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(cookieSecure)
                 .sameSite("Lax")
                 .path("/")
                 .maxAge(0)
