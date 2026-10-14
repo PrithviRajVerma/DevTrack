@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../features/auth/AuthContext';
 import { Layers, LogOut, User as UserIcon, LayoutDashboard, FolderGit2 } from 'lucide-react';
 
+import { NotificationDropdown } from '../features/notifications/NotificationDropdown';
+
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -43,7 +45,9 @@ export const Navbar: React.FC = () => {
         </div>
 
         {user && (
-          <div className="navbar-user-section">
+          <div className="navbar-user-section flex items-center space-x-3">
+            <NotificationDropdown />
+
             <div className="user-info">
               <div className="user-avatar">
                 <UserIcon size={16} />
