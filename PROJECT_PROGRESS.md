@@ -3,7 +3,7 @@
 > **Platform:** Full-Stack Issue Tracking & Team Collaboration Platform  
 > **Backend:** Java 21, Spring Boot 3.4.2, Spring Security, Spring Data JPA, PostgreSQL, Flyway  
 > **Frontend:** React 18, TypeScript, Vite, TanStack Query  
-> **Current Status:** Milestone 3 Complete | Ready for Milestone 4
+> **Current Status:** Milestone 4 Complete | Ready for Milestone 5
 
 ---
 
@@ -15,8 +15,8 @@ The implementation is structured into 5 sequential milestones across 4 architect
 flowchart LR
     M1["Milestone 1<br/><b>Foundation</b><br/>(COMPLETED)"] --> M2["Milestone 2<br/><b>Issue Management</b><br/>(COMPLETED)"]
     M2 --> M3["Milestone 3<br/><b>Collaboration</b><br/>(COMPLETED)"]
-    M3 --> M4["Milestone 4<br/><b>Background Processing</b><br/>(UP NEXT)"]
-    M4 --> M5["Milestone 5<br/><b>Production Polish</b><br/>(QUEUED)"]
+    M3 --> M4["Milestone 4<br/><b>Background Processing</b><br/>(COMPLETED)"]
+    M4 --> M5["Milestone 5<br/><b>Production Polish</b><br/>(UP NEXT)"]
 ```
 
 ---
@@ -111,18 +111,37 @@ flowchart LR
 ---
 
 ### Milestone 4: Background Processing & Concurrency
-- **Status:** **PLANNED / UP NEXT**
+- **Status:** **COMPLETED**
 - **Goal:** In-app notifications, bounded thread pool executor, backpressure, transactional outbox for reliable event delivery, and concurrency stress tests.
-- **Key Features to Implement:**
-  - [ ] Notification System: `notifications` table, list notifications, mark single/all as read, recipient privacy checks.
-  - [ ] Bounded Worker Pool: Explicit `ThreadPoolExecutor` with bounded queue, custom named thread factory, deliberate rejection policy, and graceful shutdown.
-  - [ ] Transactional Outbox: Event persistence within the same DB transaction as issue mutations, polling background worker with deduplication and bounded retries.
-  - [ ] Concurrency Verification: Multi-threaded tests verifying no duplicate issue keys under concurrent creation, conflict detection under concurrent updates, and queue backpressure behavior.
+- **Deliverables:**
+  - [x] Flyway Migration `V4__create_notifications_and_outbox.sql`:
+    - `notifications` table: recipient_id, type, message, issue_id, created_at, read_at.
+    - `outbox_events` table: aggregate_type, aggregate_id, event_type, payload, status, retry_count, timestamps.
+  - [x] In-App Notification Domain:
+    - `Notification` entity, `NotificationType` enum, `NotificationRepository` with unread count query and bulk read update.
+    - `NotificationService` enforcing strict recipient privacy (users cannot view or mark another user's notifications as read).
+    - `NotificationController`: `GET /api/notifications`, `GET /api/notifications/unread-count`, `PATCH /api/notifications/{id}/read`, `PATCH /api/notifications/read-all`.
+  - [x] Bounded ThreadPoolTaskExecutor with Backpressure (`AsyncConfig`):
+    - `ThreadPoolTaskExecutor` with `corePoolSize = 4`, `maxPoolSize = 8`, bounded `queueCapacity = 50`.
+    - Custom named thread factory `devtrack-worker-%d`.
+    - Deliberate `RejectedExecutionHandler` recording backpressure metrics (`ExecutorMetrics`) and rejecting with `RejectedExecutionException`.
+    - Graceful shutdown with 30s termination await timeout.
+  - [x] Transactional Outbox Pattern:
+    - `OutboxEventService`: `@Transactional(propagation = Propagation.MANDATORY)` guarantees outbox event insertion in the exact same DB transaction as issue creation, assignment, status change, and comment.
+    - `OutboxPollingWorker`: Scheduled worker using PostgreSQL `SELECT ... FOR UPDATE SKIP LOCKED` claiming query, dispatching events to worker pool without race conditions.
+    - `OutboxEventProcessor`: `@Transactional(propagation = Propagation.REQUIRES_NEW)` processes event, delivers notification, and tracks bounded retries (max 3) before marking `FAILED`.
+  - [x] Frontend Notification Center:
+    - `NotificationDropdown`: Bell icon in `Navbar` with unread badge counter, polling for new alerts, single-click mark as read, and "Mark all read" button.
+  - [x] Performance Benchmark Script:
+    - `benchmark/concurrency_benchmark.py`: Pure standard-library Python benchmark measuring throughput (req/sec), p50/p95/p99 latency percentiles, and error rates.
+  - [x] Automated Tests:
+    - `NotificationIntegrationTest`: 6 tests verifying listing, unread count, read marking, outsider 403 prevention, mark all read, and end-to-end outbox delivery.
+    - `ConcurrencyIntegrationTest`: 4 multi-threaded tests verifying 20-thread simultaneous issue creation without duplicate keys, 10-thread optimistic locking conflict detection, bounded queue backpressure and rejection metric tracking, and idempotent outbox deduplication.
 
 ---
 
 ### Milestone 5: Production Polish & Portfolio Readiness
-- **Status:** **QUEUED**
+- **Status:** **PLANNED / UP NEXT**
 - **Goal:** Docker Compose multi-container deployment, CI/CD pipeline, OpenAPI documentation, performance benchmark, and complete portfolio documentation.
 - **Key Features to Implement:**
   - [ ] Containerization: Multi-stage Dockerfile for backend and frontend, production `docker-compose.prod.yml`.
@@ -140,11 +159,13 @@ flowchart LR
 | **Backend** | `ProjectIntegrationTest` | 4 | 4 | 0 | PASSED |
 | **Backend** | `CommentIntegrationTest` | 6 | 6 | 0 | PASSED |
 | **Backend** | `DashboardIntegrationTest` | 6 | 6 | 0 | PASSED |
+| **Backend** | `NotificationIntegrationTest` | 6 | 6 | 0 | PASSED |
+| **Backend** | `ConcurrencyIntegrationTest` | 4 | 4 | 0 | PASSED |
 | **Backend** | `AuthServiceTest` | 4 | 4 | 0 | PASSED |
 | **Backend** | `JwtServiceTest` | 2 | 2 | 0 | PASSED |
 | **Backend** | `DevTrackApplicationTests` | 1 | 1 | 0 | PASSED |
 | **Frontend** | Type Check (`tsc`) & Vite Build | 1 | 1 | 0 | PASSED |
-| **Total** | | **38** | **38** | **0** | **100% Verified** |
+| **Total** | | **48** | **48** | **0** | **100% Verified** |
 
 ---
 
@@ -157,3 +178,5 @@ flowchart LR
 5. **Atomic Sequence Counter Pattern:** Native PostgreSQL upsert with `RETURNING last_issue_number` guarantees gapless, race-condition-free issue numbers under high thread concurrency.
 6. **Append-Only Activity Audit Trail:** Immutable `activity_events` with `Propagation.MANDATORY` guaranteeing audit persistence in the same transaction as state mutations.
 7. **Server-Side Database Aggregation:** Live metrics calculated in PostgreSQL via JPQL `GROUP BY` and `SUM` rather than fetching entities into memory.
+8. **Bounded Worker Pool & Backpressure:** Dedicated `ThreadPoolTaskExecutor` capped at 8 active threads and 50 queued tasks prevents OOM and gracefully rejects overflow tasks.
+9. **Transactional Outbox Pattern:** Outbox events committed inside primary business transactions and polled via `FOR UPDATE SKIP LOCKED` decouple notification delivery and eliminate race conditions.
