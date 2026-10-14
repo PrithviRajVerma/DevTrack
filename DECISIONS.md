@@ -14,6 +14,7 @@ This document records key architectural, engineering, and product decisions made
 | [ADR-004](#adr-004-standardized-api-error-contract-and-exception-hierarchy) | Standardized API Error Contract & Exception Hierarchy | 2026-10-14 | Accepted | API / Backend |
 | [ADR-005](#adr-005-optimistic-locking-via-jpa-version-for-issue-updates) | Optimistic Locking via JPA `@Version` for Issue Updates | 2026-10-14 | Accepted | Concurrency |
 | [ADR-006](#adr-006-atomic-project-scoped-issue-number-allocation) | Atomic Project-Scoped Issue Number Allocation | 2026-10-14 | Accepted | Concurrency / Database |
+| [ADR-007](#adr-007-native-postgresql-upsert-returning-for-atomic-counters) | Native PostgreSQL Upsert with RETURNING for Sequence Counters | 2026-10-14 | Accepted | Performance / DB |
 
 ---
 
@@ -90,3 +91,13 @@ This document records key architectural, engineering, and product decisions made
   - Guarantees sequential, gapless-where-possible issue keys without race conditions.
   - Schema-level constraint prevents corrupted data under concurrency.
 - **Consequences:** Creation transactions briefly synchronize on the project's sequence counter.
+
+
+### ADR-007: Native PostgreSQL Upsert with RETURNING for Sequence Counters
+- **Context:** Entity-level JPA updates for `ProjectCounter` with assigned keys triggered Hibernate `merge()` semantics and optimistic locking failures on concurrent inserts.
+- **Decision:** Use a single atomic native SQL query with PostgreSQL's `INSERT INTO project_counters (project_id, last_issue_number) VALUES (:projectId, 1) ON CONFLICT (project_id) DO UPDATE SET last_issue_number = project_counters.last_issue_number + 1 RETURNING last_issue_number`.
+- **Rationale:**
+  - Completely atomic in the database engine without application-level distributed or table locks.
+  - Zero ORM dirty-checking or merge-state overhead.
+  - Guaranteed monotonically increasing, unique issue keys per project under concurrent threads.
+- **Consequences:** Relies on PostgreSQL-specific dialect features, which matches the project specification.
