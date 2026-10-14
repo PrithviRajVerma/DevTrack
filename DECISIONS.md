@@ -17,6 +17,8 @@ This document records key architectural, engineering, and product decisions made
 | [ADR-007](#adr-007-native-postgresql-upsert-returning-for-atomic-counters) | Native PostgreSQL Upsert with RETURNING for Sequence Counters | 2026-10-14 | Accepted | Performance / DB |
 | [ADR-008](#adr-008-append-only-activity-audit-trail-with-mandatory-transaction-propagation) | Append-Only Activity Audit Trail with Mandatory Transaction Propagation | 2026-10-14 | Accepted | Architecture / Audit |
 | [ADR-009](#adr-009-server-side-database-aggregation-for-analytics-dashboard) | Server-Side Database Aggregation for Analytics Dashboard | 2026-10-14 | Accepted | Performance / API |
+| [ADR-010](#adr-010-bounded-threadpooltaskexecutor-with-explicit-backpressure) | Bounded ThreadPoolTaskExecutor with Explicit Backpressure | 2026-10-14 | Accepted | Concurrency |
+| [ADR-011](#adr-011-transactional-outbox-pattern-with-skip-locked-polling) | Transactional Outbox Pattern with PostgreSQL SKIP LOCKED Polling | 2026-10-14 | Accepted | Reliability / Events |
 
 ---
 
@@ -125,4 +127,28 @@ This document records key architectural, engineering, and product decisions made
   - Eliminates over-fetching; the dashboard endpoint transfers small summarized JSON payloads instead of hundreds or thousands of issue entities.
   - Enforces project boundary security directly within the query predicate (`WHERE i.project.id IN :projectIds`).
 - **Consequences:** Aggregate endpoints cannot be served directly from client caches without invalidation upon issue mutations. TanStack Query cache tags manage this effectively.
+
+---
+
+### ADR-010: Bounded ThreadPoolTaskExecutor with Explicit Backpressure
+- **Context:** Background notification processing and async event delivery require worker threads. Using unbounded queues (`LinkedBlockingQueue()` with default Integer.MAX_VALUE) or unbounded thread creation risks catastrophic OutOfMemoryError (OOM) or thread exhaustion under sudden burst traffic.
+- **Decision:** Configure a dedicated Spring `ThreadPoolTaskExecutor` bean (`notificationTaskExecutor`) with `corePoolSize = 4`, `maxPoolSize = 8`, bounded `queueCapacity = 50`, named thread factory (`devtrack-worker-%d`), graceful shutdown with 30s timeout, and a custom `RejectedExecutionHandler` that increments observability metrics and throws `RejectedExecutionException`.
+- **Rationale:**
+  - Prevents unbounded memory growth during load spikes by capping total pending background tasks at 58 (8 active + 50 queued).
+  - Explicit backpressure signals to callers that system capacity is reached rather than silently failing or degrading application latency.
+  - Named threads simplify log correlation and profiling.
+- **Consequences:** Upstream callers or polling workers must handle `RejectedExecutionException` gracefully by backing off and retrying in subsequent poll cycles.
+
+---
+
+### ADR-011: Transactional Outbox Pattern with PostgreSQL SKIP LOCKED Polling
+- **Context:** In-app notifications must be created reliably when issues are assigned, statuses transition, or comments are added. Direct asynchronous dispatch inside the HTTP request transaction creates race conditions (asynchronous workers may attempt to read data before the primary transaction commits) or loses notifications if the process terminates mid-flight.
+- **Decision:** Implement the Transactional Outbox Pattern. Insert events into `outbox_events` within the same database transaction as issue and comment changes. A background worker polls pending events using PostgreSQL's `SELECT ... FOR UPDATE SKIP LOCKED` query and dispatches them to the bounded thread pool executor.
+- **Rationale:**
+  - Guarantees at-least-once event delivery; notifications are never lost if the server restarts.
+  - Decouples notification delivery and serialization from client-facing transaction response times.
+  - `FOR UPDATE SKIP LOCKED` eliminates concurrency bottlenecks and prevents multiple workers from processing identical events.
+  - Worker processing is idempotent: duplicate notification generation is guarded by unique recipient and message checks.
+- **Consequences:** Notifications are delivered asynchronously (within ~1-2 seconds of state mutation) rather than synchronously in the same HTTP response.
+
 
