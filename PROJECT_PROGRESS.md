@@ -201,4 +201,5 @@ flowchart LR
 8. **Bounded Worker Pool & Backpressure:** Dedicated `ThreadPoolTaskExecutor` capped at 8 active threads and 50 queued tasks prevents OOM and gracefully rejects overflow tasks.
 9. **Transactional Outbox Pattern:** Outbox events committed inside primary business transactions and polled via `FOR UPDATE SKIP LOCKED` decouple notification delivery and eliminate race conditions.
 10. **Multi-Stage Containerization & CI/CD Pipeline:** Hardened unprivileged container images (Temurin JRE non-root + Nginx Alpine) automated by GitHub Actions.
+11. **Design System Modernization & Mobile-First Architecture:** Integrated Stitch MCP ("DevTrack Linear Slate"), responsive bottom navigation dock, horizontal mobile status tabs for Kanban, one-tap touch card controls, and mobile floating action buttons (FABs).
 

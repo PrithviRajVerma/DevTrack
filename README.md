@@ -200,6 +200,8 @@ erDiagram
 | | UI Framework | **React 18** with functional components and custom hooks |
 | | Server State | **TanStack React Query 5** for asynchronous caching, polling, and invalidation |
 | | Routing | **React Router 6** with protected route guards and dynamic URL params |
+| | Design System | **Stitch MCP "DevTrack Linear Slate"** with responsive dark glassmorphic tokens & Geist/JetBrains Mono fonts |
+| | Mobile UX | **Mobile-First Responsive Architecture** with bottom navigation dock, horizontal Kanban tabs, touch shift buttons & FAB |
 | | Icons | **Lucide React** for lightweight, consistent SVG icon set |
 | **DevOps** | Containerization | Multi-stage **Docker** (Eclipse Temurin JRE Alpine + Nginx Alpine) |
 | | Orchestration | **Docker Compose** (`docker-compose.yml` for dev, `docker-compose.prod.yml` for prod) |

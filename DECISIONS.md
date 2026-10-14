@@ -19,6 +19,8 @@ This document records key architectural, engineering, and product decisions made
 | [ADR-009](#adr-009-server-side-database-aggregation-for-analytics-dashboard) | Server-Side Database Aggregation for Analytics Dashboard | 2026-10-14 | Accepted | Performance / API |
 | [ADR-010](#adr-010-bounded-threadpooltaskexecutor-with-explicit-backpressure) | Bounded ThreadPoolTaskExecutor with Explicit Backpressure | 2026-10-14 | Accepted | Concurrency |
 | [ADR-011](#adr-011-transactional-outbox-pattern-with-skip-locked-polling) | Transactional Outbox Pattern with PostgreSQL SKIP LOCKED Polling | 2026-10-14 | Accepted | Reliability / Events |
+| [ADR-012](#adr-012-multi-stage-production-containerization-and-cicd-automation) | Multi-Stage Production Containerization & CI/CD Automation | 2026-10-14 | Accepted | DevOps / CI/CD |
+| [ADR-013](#adr-013-design-system-modernization-via-stitch-mcp--mobile-first-responsive-architecture) | Design System Modernization via Stitch MCP & Mobile-First Architecture | 2026-10-14 | Accepted | Frontend / UX |
 
 ---
 
@@ -166,6 +168,31 @@ This document records key architectural, engineering, and product decisions made
   - Reverse-proxying API requests through Nginx establishes a single origin, eliminating cross-origin cookie restrictions and CORS preflight overhead.
   - Automated CI ensures no untested code or broken builds reach main branches.
 - **Consequences:** Local production testing requires Docker Engine and Docker Compose.
+
+---
+
+### ADR-013: Design System Modernization via Stitch MCP & Mobile-First Responsive Architecture
+- **Context:** The initial user interface was functional but visually plain and constrained on mobile screens. Multi-column kanban boards broke on viewports under 768px, navigation was desktop-centric, and modals overflowed on mobile viewports.
+- **Decision:**
+  1. **Stitch MCP Design System Generation**:
+     - Connected to Stitch MCP and created project `projects/10754826954585634196` ("DevTrack Enterprise Issue Tracker").
+     - Generated and applied the **DevTrack Linear Slate** design system (`assets/3222367478a54b2db235fb319996f50c`):
+       - Slate-dark theme hierarchy: canvas base (`#0b0f17`), navbar/sidebar dock (`#0f172a`), card surfaces (`#111827`), elevated modal surfaces (`#1e293b`), and subtle borders (`#1e293b` / `#334155`).
+       - Vivid indigo brand accent (`#6366f1` / `#4f46e5` hover / `#818cf8` electric).
+       - Semantic state badges: Todo (`#38bdf8`), In Progress (`#f59e0b`), In Review (`#a855f7`), Done (`#10b981`), Urgent (`#f43f5e`).
+       - Typography pairings: Geist and Inter for sans UI hierarchy; JetBrains Mono for monospace issue keys (`DEV-104`) and code indicators.
+  2. **Mobile-First Responsive Architecture**:
+     - **Bottom-Docked Mobile Navigation** (`.mobile-bottom-nav`): Fixed bottom bar with blurred background providing 1-thumb access to Dashboard, Workspaces, and Sign Out on mobile devices (< 768px).
+     - **Horizontal Column Tabs for Mobile Kanban**: Instead of a horizontally compressed 4-column layout that forces awkward scrolling, mobile screens render a horizontal status tab bar (`To Do`, `In Progress`, `In Review`, `Done`) with issue counts. Users can swipe or tap to view one column at a time.
+     - **Touch-Friendly Status Shift Controls**: Added accessible one-tap advance/regress arrow buttons (`<-` / `->`) directly on mobile issue cards so users do not have to struggle with clumsy drag-and-drop on touchscreens. Desktop drag-and-drop remains intact.
+     - **Floating Action Buttons (FAB)**: Quick 1-tap `+` button in bottom right corner on mobile viewports for creating issues and workspaces instantly.
+     - **Responsive Bottom-Sheet Modals**: Modals automatically transform into touch-friendly bottom sheets on small screens (`max-height: 85vh`, rounded top corners, full-width actions).
+- **Rationale:**
+  - Mirrors high-end developer tools like Linear and GitHub Projects.
+  - Ensures 100% usability and ergonomics on smartphones, tablets, and desktop workstations alike.
+  - Eliminates clumsy HTML5 drag-and-drop gestures on mobile touch screens in favor of reliable one-tap transitions.
+- **Consequences:** All CSS tokens are maintained as custom properties in `src/index.css`, allowing future theme adjustments or high-contrast modes without modifying component logic.
+
 
 
 
