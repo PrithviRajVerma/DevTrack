@@ -187,14 +187,6 @@ public class IssueService {
     }
 
     private int allocateNextIssueNumber(Project project) {
-        ProjectCounter counter = projectCounterRepository.findByProjectIdForUpdate(project.getId())
-                .orElseGet(() -> {
-                    ProjectCounter newCounter = new ProjectCounter(project);
-                    return projectCounterRepository.saveAndFlush(newCounter);
-                });
-
-        int nextNumber = counter.incrementAndGet();
-        projectCounterRepository.saveAndFlush(counter);
-        return nextNumber;
+        return projectCounterRepository.getNextIssueNumber(project.getId());
     }
 }

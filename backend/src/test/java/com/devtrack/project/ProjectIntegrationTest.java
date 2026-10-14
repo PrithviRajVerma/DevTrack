@@ -121,7 +121,7 @@ class ProjectIntegrationTest {
                         .header("Authorization", "Bearer " + outsiderToken))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403))
-                .andExpect(jsonPath("$.message").value("You do not have permission to access this resource"));
+                .andExpect(jsonPath("$.message").value("You do not have access to this project"));
     }
 
     @Test
