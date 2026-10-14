@@ -4,9 +4,12 @@ import {
   ArrowRight,
   ArrowLeft,
   Calendar,
-  User as UserIcon,
+  ChevronUp,
+  ChevronsUp,
+  Minus,
+  ChevronDown,
 } from 'lucide-react';
-import { Issue, IssueStatus } from '../../types/issue';
+import { Issue, IssueStatus, IssuePriority } from '../../types/issue';
 import { updateIssue } from '../../api/issues';
 import { ApiException } from '../../api/client';
 
@@ -17,11 +20,11 @@ interface Props {
   onRefreshNeeded: () => void;
 }
 
-const COLUMNS: { status: IssueStatus; label: string; headerColor: string }[] = [
-  { status: 'TODO', label: 'To Do', headerColor: 'border-t-4 border-slate-400' },
-  { status: 'IN_PROGRESS', label: 'In Progress', headerColor: 'border-t-4 border-blue-500' },
-  { status: 'IN_REVIEW', label: 'In Review', headerColor: 'border-t-4 border-amber-500' },
-  { status: 'DONE', label: 'Done', headerColor: 'border-t-4 border-emerald-500' },
+const COLUMNS: { status: IssueStatus; label: string; dotColor: string }[] = [
+  { status: 'TODO', label: 'To Do', dotColor: 'var(--status-todo)' },
+  { status: 'IN_PROGRESS', label: 'In Progress', dotColor: 'var(--status-in-progress)' },
+  { status: 'IN_REVIEW', label: 'In Review', dotColor: 'var(--status-in-review)' },
+  { status: 'DONE', label: 'Done', dotColor: 'var(--status-done)' },
 ];
 
 export const KanbanBoard: React.FC<Props> = ({
@@ -33,6 +36,7 @@ export const KanbanBoard: React.FC<Props> = ({
   const [draggedIssueId, setDraggedIssueId] = useState<number | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [boardError, setBoardError] = useState<string | null>(null);
+  const [activeMobileStatus, setActiveMobileStatus] = useState<IssueStatus>('TODO');
 
   const handleStatusChange = async (issue: Issue, targetStatus: IssueStatus) => {
     if (issue.status === targetStatus) return;
@@ -108,140 +112,185 @@ export const KanbanBoard: React.FC<Props> = ({
     }
   };
 
-  const isOverdue = (dueDate?: string, status?: IssueStatus) => {
-    if (!dueDate || status === 'DONE') return false;
-    return new Date(dueDate) < new Date(new Date().setHours(0, 0, 0, 0));
+  const getPriorityIcon = (priority: IssuePriority) => {
+    switch (priority) {
+      case 'URGENT':
+        return <ChevronsUp size={14} className="text-rose-500" />;
+      case 'HIGH':
+        return <ChevronUp size={14} className="text-orange-500" />;
+      case 'MEDIUM':
+        return <Minus size={14} className="text-sky-500" />;
+      case 'LOW':
+        return <ChevronDown size={14} className="text-slate-400" />;
+    }
+  };
+
+  const getAssigneeInitials = (name?: string) => {
+    if (!name) return '—';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
   };
 
   return (
-    <div className="kanban-wrapper">
+    <div className="kanban-board-wrapper">
       {boardError && (
-        <div className="alert alert-warning mb-4" role="alert">
+        <div className="alert alert-error" role="alert" style={{ marginBottom: '1rem' }}>
           <AlertCircle size={16} />
           <span>{boardError}</span>
         </div>
       )}
 
-      <div className="kanban-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Mobile Horizontal Status Tabs (< 768px) */}
+      <div className="mobile-status-tabs" role="tablist">
         {COLUMNS.map((col) => {
-          const colIssues = issues.filter((i) => i.status === col.status);
+          const count = issues.filter((i) => i.status === col.status).length;
+          const isActive = activeMobileStatus === col.status;
+          return (
+            <button
+              key={col.status}
+              role="tab"
+              aria-selected={isActive}
+              className={`mobile-status-tab-btn ${isActive ? 'active' : ''}`}
+              onClick={() => setActiveMobileStatus(col.status)}
+            >
+              <span
+                className="kanban-status-dot"
+                style={{ backgroundColor: col.dotColor }}
+              />
+              <span>{col.label}</span>
+              <span className="kanban-count">{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Kanban Board Grid */}
+      <div className="kanban-board">
+        {COLUMNS.map((col) => {
+          const columnIssues = issues.filter((i) => i.status === col.status);
+          const isHiddenOnMobile = activeMobileStatus !== col.status;
 
           return (
             <div
               key={col.status}
-              className={`kanban-column flex flex-col bg-card/60 rounded-lg p-3 border border-border shadow-sm min-h-[500px] ${col.headerColor}`}
+              className={`kanban-column ${isHiddenOnMobile ? 'kanban-column-hidden-mobile' : ''}`}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, col.status)}
             >
-              {/* Column Header */}
-              <div className="kanban-col-header flex items-center justify-between pb-3 mb-3 border-b border-border">
-                <span className="font-semibold text-sm">{col.label}</span>
-                <span className="badge badge-subtle text-xs px-2 py-0.5 rounded-full font-mono">
-                  {colIssues.length}
-                </span>
+              <div className="kanban-header">
+                <div className="kanban-header-left">
+                  <span
+                    className="kanban-status-dot"
+                    style={{ backgroundColor: col.dotColor }}
+                  />
+                  <h3 className="kanban-title">{col.label}</h3>
+                  <span className="kanban-count">{columnIssues.length}</span>
+                </div>
               </div>
 
-              {/* Column Cards */}
-              <div className="kanban-col-cards flex-1 space-y-3 overflow-y-auto">
-                {colIssues.map((issue) => {
-                  const overdue = isOverdue(issue.dueDate, issue.status);
-                  const isBeingUpdated = updatingId === issue.id;
-                  const nextStatus = getNextStatus(issue.status);
-                  const prevStatus = getPrevStatus(issue.status);
-
-                  return (
-                    <div
-                      key={issue.id}
-                      draggable={!isBeingUpdated}
-                      onDragStart={(e) => handleDragStart(e, issue.id)}
-                      onClick={() => onIssueClick(issue)}
-                      className={`kanban-card p-3 rounded-md bg-card border border-border hover:border-primary/50 shadow-sm cursor-pointer transition-all ${
-                        isBeingUpdated ? 'opacity-50 pointer-events-none' : ''
-                      } ${draggedIssueId === issue.id ? 'border-primary ring-2 ring-primary/20' : ''}`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="badge badge-primary font-mono text-xs">{issue.key}</span>
-                        <div className="flex items-center space-x-1">
-                          <span
-                            className={`badge text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                              issue.priority === 'URGENT'
-                                ? 'bg-red-500/20 text-red-500'
-                                : issue.priority === 'HIGH'
-                                ? 'bg-amber-500/20 text-amber-500'
-                                : issue.priority === 'MEDIUM'
-                                ? 'bg-blue-500/20 text-blue-500'
-                                : 'bg-slate-500/20 text-slate-400'
-                            }`}
-                          >
-                            {issue.priority}
-                          </span>
-                          <span className="badge badge-subtle text-[10px] px-1.5 py-0.5 rounded">
-                            {issue.type}
-                          </span>
-                        </div>
-                      </div>
-
-                      <h4 className="font-medium text-sm text-foreground line-clamp-2 mb-2">
-                        {issue.title}
-                      </h4>
-
-                      <div className="flex items-center justify-between text-xs text-secondary pt-2 border-t border-border">
-                        <div className="flex items-center space-x-1">
-                          <UserIcon size={12} />
-                          <span className="truncate max-w-[100px]">
-                            {issue.assignee ? issue.assignee.name : 'Unassigned'}
-                          </span>
-                        </div>
-
-                        {issue.dueDate && (
-                          <div
-                            className={`flex items-center space-x-1 ${
-                              overdue ? 'text-destructive font-semibold' : ''
-                            }`}
-                          >
-                            <Calendar size={12} />
-                            <span>{issue.dueDate}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Quick Move Transition Controls */}
-                      <div
-                        className="flex items-center justify-between mt-2 pt-1"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {prevStatus ? (
-                          <button
-                            type="button"
-                            className="btn-icon p-1 text-secondary hover:text-foreground text-xs flex items-center"
-                            title={`Move back to ${prevStatus}`}
-                            onClick={() => handleStatusChange(issue, prevStatus)}
-                          >
-                            <ArrowLeft size={12} />
-                          </button>
-                        ) : (
-                          <div />
-                        )}
-
-                        {nextStatus && (
-                          <button
-                            type="button"
-                            className="btn-icon p-1 text-secondary hover:text-foreground text-xs flex items-center"
-                            title={`Advance to ${nextStatus}`}
-                            onClick={() => handleStatusChange(issue, nextStatus)}
-                          >
-                            <ArrowRight size={12} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {colIssues.length === 0 && (
-                  <div className="py-12 text-center text-xs text-secondary border-2 border-dashed border-border/60 rounded-md">
-                    Drop issues here
+              <div className="kanban-cards">
+                {columnIssues.length === 0 ? (
+                  <div className="kanban-empty">
+                    <p>No issues in {col.label}</p>
                   </div>
+                ) : (
+                  columnIssues.map((issue) => {
+                    const isUpdating = updatingId === issue.id;
+                    const next = getNextStatus(issue.status);
+                    const prev = getPrevStatus(issue.status);
+
+                    return (
+                      <div
+                        key={issue.id}
+                        className={`kanban-card ${
+                          draggedIssueId === issue.id ? 'dragging' : ''
+                        }`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, issue.id)}
+                        onClick={() => onIssueClick(issue)}
+                      >
+                        <div className="kanban-card-header">
+                          <span className="badge-code font-mono">{issue.key}</span>
+                          <div className="flex items-center gap-1">
+                            {getPriorityIcon(issue.priority)}
+                            <span className={`badge badge-${issue.priority.toLowerCase()}`}>
+                              {issue.priority}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="kanban-card-title">{issue.title}</div>
+
+                        <div className="kanban-card-footer">
+                          <div className="kanban-card-meta">
+                            {issue.dueDate && (
+                              <span
+                                className="badge"
+                                style={{
+                                  background: 'rgba(255,255,255,0.04)',
+                                  color: 'var(--color-text-secondary)',
+                                  border: '1px solid var(--border-subtle)',
+                                }}
+                              >
+                                <Calendar size={11} style={{ marginRight: 2 }} />
+                                {issue.dueDate}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {issue.assignee ? (
+                              <div
+                                className="user-avatar"
+                                style={{ width: 22, height: 22, fontSize: '0.65rem' }}
+                                title={`Assignee: ${issue.assignee.name}`}
+                              >
+                                {getAssigneeInitials(issue.assignee.name)}
+                              </div>
+                            ) : (
+                              <span
+                                className="text-xs text-muted"
+                                title="Unassigned"
+                              >
+                                Unassigned
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* One-Tap Advance / Regress Buttons (Touch-friendly) */}
+                        <div
+                          className="kanban-actions"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {prev && (
+                            <button
+                              className="btn btn-outline btn-sm btn-icon"
+                              disabled={isUpdating}
+                              onClick={() => handleStatusChange(issue, prev)}
+                              title={`Move back to ${prev.replace('_', ' ')}`}
+                            >
+                              <ArrowLeft size={13} />
+                            </button>
+                          )}
+                          <div style={{ flex: 1 }} />
+                          {next && (
+                            <button
+                              className="btn btn-outline btn-sm btn-icon"
+                              disabled={isUpdating}
+                              onClick={() => handleStatusChange(issue, next)}
+                              title={`Advance to ${next.replace('_', ' ')}`}
+                            >
+                              <ArrowRight size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
