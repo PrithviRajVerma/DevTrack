@@ -3,7 +3,7 @@
 > **Platform:** Full-Stack Issue Tracking & Team Collaboration Platform  
 > **Backend:** Java 21, Spring Boot 3.4.2, Spring Security, Spring Data JPA, PostgreSQL, Flyway  
 > **Frontend:** React 18, TypeScript, Vite, TanStack Query  
-> **Current Status:** Milestone 1 Complete | Ready for Milestone 2
+> **Current Status:** Milestone 3 Complete | Ready for Milestone 4
 
 ---
 
@@ -13,9 +13,9 @@ The implementation is structured into 5 sequential milestones across 4 architect
 
 ```mermaid
 flowchart LR
-    M1["Milestone 1<br/><b>Foundation</b><br/>(COMPLETED)"] --> M2["Milestone 2<br/><b>Issue Management</b><br/>(UP NEXT)"]
-    M2 --> M3["Milestone 3<br/><b>Collaboration</b><br/>(QUEUED)"]
-    M3 --> M4["Milestone 4<br/><b>Background Processing</b><br/>(QUEUED)"]
+    M1["Milestone 1<br/><b>Foundation</b><br/>(COMPLETED)"] --> M2["Milestone 2<br/><b>Issue Management</b><br/>(COMPLETED)"]
+    M2 --> M3["Milestone 3<br/><b>Collaboration</b><br/>(COMPLETED)"]
+    M3 --> M4["Milestone 4<br/><b>Background Processing</b><br/>(UP NEXT)"]
     M4 --> M5["Milestone 5<br/><b>Production Polish</b><br/>(QUEUED)"]
 ```
 
@@ -79,19 +79,39 @@ flowchart LR
 ---
 
 ### Milestone 3: Team Collaboration
-- **Status:** **PLANNED / UP NEXT**
+- **Status:** **COMPLETED**
 - **Goal:** Issue comments, immutable activity history, Kanban drag-and-drop board, and dashboard aggregate metrics.
-- **Key Features to Implement:**
-  - [ ] Comments: `comments` table, author-only edit/delete policy, validated input.
-  - [ ] Activity History: `activity_events` append-only audit trail capturing issue creation, status changes, assignments, and priority changes.
-  - [ ] Kanban Board: Interactive board with status columns (`TODO`, `IN_PROGRESS`, `IN_REVIEW`, `DONE`), drag-and-drop state persistence, rollback on server error.
-  - [ ] Dashboard Metrics: Backend aggregate queries for total issues, status distribution, overdue count, and assignee workload.
-  - [ ] Automated Tests: Comment authorization tests, audit trail immutability tests, dashboard aggregation tests.
+- **Deliverables:**
+  - [x] Flyway Migration `V3__create_comments_and_activity.sql`:
+    - `comments` table with foreign keys, cascade deletes, and composite indexes.
+    - `activity_events` immutable table capturing actor, issue, event type, and details.
+  - [x] Activity Audit Domain:
+    - `ActivityEvent` entity with `ActivityEventType` (`ISSUE_CREATED`, `STATUS_CHANGED`, `PRIORITY_CHANGED`, `ASSIGNEE_CHANGED`, `COMMENT_ADDED`, `COMMENT_DELETED`).
+    - `@Transactional(propagation = Propagation.MANDATORY)` audit logging directly wired into issue creation, editing, and comment lifecycle.
+    - `ActivityController`: `GET /api/issues/{issueId}/activity`.
+  - [x] Comment Domain:
+    - `Comment` entity, `CommentRepository` with eager author fetch query.
+    - `CommentService` enforcing author-only edit policy, author or project owner deletion policy, and project membership checks.
+    - `CommentController`: `POST /api/issues/{id}/comments`, `GET /api/issues/{id}/comments`, `PATCH /api/comments/{id}`, `DELETE /api/comments/{id}`.
+  - [x] Analytics & Dashboard Domain:
+    - JPQL server-side aggregate queries in `IssueRepository` (`GROUP BY status`, `GROUP BY priority`, `GROUP BY assignee`).
+    - `DashboardService` scoping metrics to projects accessible by the authenticated user.
+    - `DashboardController`: `GET /api/dashboard/summary`, `GET /api/dashboard/workload`, `GET /api/dashboard/recent-activity`.
+  - [x] Frontend Collaboration UI:
+    - `CommentsSection`: Chronological discussion, author edit in-place, delete controls, and relative timestamps.
+    - `ActivityTimeline`: Detailed event cards with visual action icons, timestamps, and actor info.
+    - Enhanced `EditIssueModal`: Tabbed navigation between Details, Comments, and Activity History.
+    - `KanbanBoard`: 4 status columns (`TODO`, `IN_PROGRESS`, `IN_REVIEW`, `DONE`), HTML5 drag-and-drop status changes, quick status advance controls, and conflict rollback handling.
+    - `ProjectDetailsPage`: Dynamic view switcher between Table View and Kanban Board.
+    - `DashboardPage`: Live metrics with project filter, KPI cards (Total, Assigned, Overdue, Completion Rate), status/priority charts, team workload table, and recent activity stream.
+  - [x] Automated Tests:
+    - `CommentIntegrationTest`: 6 tests verifying comment creation, audit logging, outsider 403 rejection, author-only editing, and author/owner deletion.
+    - `DashboardIntegrationTest`: 6 tests verifying cross-project summary aggregates, single-project filtering, outsider project denial (403), assignee workload breakdown, and user-scoped recent activity.
 
 ---
 
 ### Milestone 4: Background Processing & Concurrency
-- **Status:** **QUEUED**
+- **Status:** **PLANNED / UP NEXT**
 - **Goal:** In-app notifications, bounded thread pool executor, backpressure, transactional outbox for reliable event delivery, and concurrency stress tests.
 - **Key Features to Implement:**
   - [ ] Notification System: `notifications` table, list notifications, mark single/all as read, recipient privacy checks.
@@ -118,11 +138,13 @@ flowchart LR
 | **Backend** | `AuthIntegrationTest` | 8 | 8 | 0 | PASSED |
 | **Backend** | `IssueIntegrationTest` | 6 | 6 | 0 | PASSED |
 | **Backend** | `ProjectIntegrationTest` | 4 | 4 | 0 | PASSED |
+| **Backend** | `CommentIntegrationTest` | 6 | 6 | 0 | PASSED |
+| **Backend** | `DashboardIntegrationTest` | 6 | 6 | 0 | PASSED |
 | **Backend** | `AuthServiceTest` | 4 | 4 | 0 | PASSED |
 | **Backend** | `JwtServiceTest` | 2 | 2 | 0 | PASSED |
 | **Backend** | `DevTrackApplicationTests` | 1 | 1 | 0 | PASSED |
 | **Frontend** | Type Check (`tsc`) & Vite Build | 1 | 1 | 0 | PASSED |
-| **Total** | | **26** | **26** | **0** | **100% Verified** |
+| **Total** | | **38** | **38** | **0** | **100% Verified** |
 
 ---
 
@@ -130,5 +152,8 @@ flowchart LR
 
 1. **Architecture Style — Modular Monolith:** Single Spring Boot service and PostgreSQL database. Eliminates premature microservice distributed transaction overhead while maintaining clean package separation.
 2. **Authentication Strategy — HttpOnly Cookie + Bearer Fallback:** Web browsers store JWT in an `HttpOnly`, `SameSite=Lax` cookie to guard against XSS token exfiltration. Programmatic API clients and tests can supply `Authorization: Bearer <token>`.
-3. **Optimistic Locking Guard:** Database records for issues will use JPA `@Version` to detect concurrent write collisions and return HTTP `409 Conflict` instead of silent overwrites.
+3. **Optimistic Locking Guard:** Database records for issues use JPA `@Version` to detect concurrent write collisions and return HTTP `409 Conflict` instead of silent overwrites.
 4. **Issue Numbering Strategy:** Composite uniqueness on `(project_id, issue_number)` enforced in PostgreSQL schema to guarantee conflict-free key generation.
+5. **Atomic Sequence Counter Pattern:** Native PostgreSQL upsert with `RETURNING last_issue_number` guarantees gapless, race-condition-free issue numbers under high thread concurrency.
+6. **Append-Only Activity Audit Trail:** Immutable `activity_events` with `Propagation.MANDATORY` guaranteeing audit persistence in the same transaction as state mutations.
+7. **Server-Side Database Aggregation:** Live metrics calculated in PostgreSQL via JPQL `GROUP BY` and `SUM` rather than fetching entities into memory.
