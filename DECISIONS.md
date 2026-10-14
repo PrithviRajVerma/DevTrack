@@ -151,4 +151,21 @@ This document records key architectural, engineering, and product decisions made
   - Worker processing is idempotent: duplicate notification generation is guarded by unique recipient and message checks.
 - **Consequences:** Notifications are delivered asynchronously (within ~1-2 seconds of state mutation) rather than synchronously in the same HTTP response.
 
+---
+
+### ADR-012: Multi-Stage Production Containerization and CI/CD Automation
+- **Context:** Delivering a reproducible, production-grade deployment requires containerizing the modular monolith (Spring Boot backend, React Vite SPA frontend, PostgreSQL database) and establishing automated verification via continuous integration.
+- **Decision:**
+  1. Multi-stage Dockerfile for backend (`eclipse-temurin:21-jdk-alpine` builder stage, `eclipse-temurin:21-jre-alpine` runtime stage) running under an unprivileged system user (`devtrack:devtrack`) with Spring Boot Actuator liveness/readiness healthchecks.
+  2. Multi-stage Dockerfile for frontend (`node:20-alpine` builder stage, `nginx:1.27-alpine` runtime stage) serving pre-compiled static bundles with gzip compression, security headers, SPA client-side routing fallback, and reverse-proxying `/api/` and `/actuator/` requests to the internal backend container.
+  3. Production Docker Compose (`docker-compose.prod.yml`) orchestrating service healthcheck dependency chains (`condition: service_healthy`) and persistent volume mounts.
+  4. GitHub Actions CI pipeline (`.github/workflows/ci.yml`) triggering on pushes and pull requests to run PostgreSQL service integration tests, Maven test suite, TypeScript verification, and container image build validation.
+- **Rationale:**
+  - Dramatically reduces production image size by discarding build tools (JDK, Maven, Node.js, source code) from final images.
+  - Running as non-root mitigates container escape and privilege escalation vulnerabilities.
+  - Reverse-proxying API requests through Nginx establishes a single origin, eliminating cross-origin cookie restrictions and CORS preflight overhead.
+  - Automated CI ensures no untested code or broken builds reach main branches.
+- **Consequences:** Local production testing requires Docker Engine and Docker Compose.
+
+
 
