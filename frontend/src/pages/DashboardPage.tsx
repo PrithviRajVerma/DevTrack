@@ -7,6 +7,7 @@ import { listProjects } from '../api/projects';
 import { DashboardSummary, AssigneeWorkload } from '../types/dashboard';
 import { ActivityEvent } from '../types/activity';
 import { Project } from '../types/project';
+import { Avatar } from '../components/common/Avatar';
 import {
   FolderKanban,
   CheckCircle2,
@@ -16,6 +17,9 @@ import {
   Activity,
   ArrowRight,
   Filter,
+  RefreshCw,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
@@ -27,6 +31,7 @@ export const DashboardPage: React.FC = () => {
   const [workload, setWorkload] = useState<AssigneeWorkload[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadProjects = useCallback(async () => {
@@ -39,7 +44,6 @@ export const DashboardPage: React.FC = () => {
   }, []);
 
   const loadDashboardData = useCallback(async (projectId?: number) => {
-    setIsLoading(true);
     setError(null);
     try {
       const [sum, work, act] = await Promise.all([
@@ -54,6 +58,7 @@ export const DashboardPage: React.FC = () => {
       setError('Failed to load dashboard metrics.');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -62,10 +67,19 @@ export const DashboardPage: React.FC = () => {
   }, [loadProjects]);
 
   useEffect(() => {
+    setIsLoading(true);
     loadDashboardData(selectedProjectId);
   }, [loadDashboardData, selectedProjectId]);
 
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadDashboardData(selectedProjectId);
+  };
+
   const doneCount = summary?.statusBreakdown?.DONE || 0;
+  const inProgressCount = summary?.statusBreakdown?.IN_PROGRESS || 0;
+  const inReviewCount = summary?.statusBreakdown?.IN_REVIEW || 0;
+  const todoCount = summary?.statusBreakdown?.TODO || 0;
   const totalCount = summary?.totalIssues || 0;
   const completionPercentage = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 
@@ -74,34 +88,59 @@ export const DashboardPage: React.FC = () => {
       <Navbar />
 
       <main className="main-content">
-        <div className="container space-y-6">
-          {/* Header & Project Filter */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-border">
+        <div className="container" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Header & Workspace Filter */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+              paddingBottom: '1rem',
+              borderBottom: '1px solid var(--border-subtle)',
+            }}
+            className="sm:flex-row sm:items-center sm:justify-between"
+          >
             <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Welcome back, {user?.name || 'Developer'}!
-              </h1>
-              <p className="text-sm text-secondary">
-                Live workspace metrics, team workload, and real-time collaboration activity.
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--color-text-main)', letterSpacing: '-0.02em' }}>
+                  Welcome back, {user?.name || 'Developer'}
+                </h1>
+                <Sparkles size={16} style={{ color: 'var(--color-primary-base)' }} />
+              </div>
+              <p className="text-xs text-secondary">
+                Real-time metrics, active sprint throughput, and collaboration activity.
               </p>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Filter size={16} className="text-secondary" />
-              <select
-                className="form-select form-select-sm"
-                value={selectedProjectId || ''}
-                onChange={(e) =>
-                  setSelectedProjectId(e.target.value ? Number(e.target.value) : undefined)
-                }
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Filter size={14} className="text-secondary" />
+                <select
+                  className="form-select form-select-sm"
+                  style={{ minWidth: 180, fontSize: '0.8rem' }}
+                  value={selectedProjectId || ''}
+                  onChange={(e) =>
+                    setSelectedProjectId(e.target.value ? Number(e.target.value) : undefined)
+                  }
+                >
+                  <option value="">All Accessible Workspaces</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.projectKey})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-outline btn-sm btn-icon"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                title="Refresh Metrics"
               >
-                <option value="">All Accessible Projects</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.projectKey})
-                  </option>
-                ))}
-              </select>
+                <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+              </button>
             </div>
           </div>
 
@@ -112,193 +151,328 @@ export const DashboardPage: React.FC = () => {
           )}
 
           {isLoading ? (
-            <div className="center-screen py-16">
+            <div className="loading-state" style={{ padding: '4rem 0' }}>
               <div className="spinner"></div>
-              <p className="loading-text">Aggregating live project metrics...</p>
+              <p className="loading-text">Aggregating workspace analytics...</p>
             </div>
           ) : (
             <>
-              {/* KPI Summary Cards */}
+              {/* 4 Metric KPI Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="card p-4 flex items-center space-x-4 border border-border shadow-sm">
-                  <div className="p-3 bg-blue-500/10 text-blue-500 rounded-lg">
-                    <FolderKanban size={24} />
+                {/* Total Issues */}
+                <div
+                  className="card"
+                  style={{
+                    padding: '1.15rem 1.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 'var(--radius-md)',
+                      background: 'rgba(56, 189, 248, 0.12)',
+                      color: '#38bdf8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <FolderKanban size={22} />
                   </div>
                   <div>
-                    <span className="text-xs text-secondary font-medium uppercase tracking-wider">
+                    <span className="text-xs text-secondary font-medium" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Total Issues
                     </span>
-                    <h3 className="text-2xl font-bold text-foreground">{summary?.totalIssues || 0}</h3>
+                    <h3 style={{ fontSize: '1.65rem', fontWeight: 700, color: 'var(--color-text-main)', lineHeight: 1.2 }}>
+                      {summary?.totalIssues || 0}
+                    </h3>
                   </div>
                 </div>
 
-                <div className="card p-4 flex items-center space-x-4 border border-border shadow-sm">
-                  <div className="p-3 bg-purple-500/10 text-purple-500 rounded-lg">
-                    <UserCheck size={24} />
+                {/* Assigned To Me */}
+                <div
+                  className="card"
+                  style={{
+                    padding: '1.15rem 1.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 'var(--radius-md)',
+                      background: 'rgba(168, 85, 247, 0.12)',
+                      color: '#c084fc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <UserCheck size={22} />
                   </div>
                   <div>
-                    <span className="text-xs text-secondary font-medium uppercase tracking-wider">
+                    <span className="text-xs text-secondary font-medium" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Assigned To Me
                     </span>
-                    <h3 className="text-2xl font-bold text-foreground">
+                    <h3 style={{ fontSize: '1.65rem', fontWeight: 700, color: 'var(--color-text-main)', lineHeight: 1.2 }}>
                       {summary?.openIssuesAssignedToMe || 0}
                     </h3>
                   </div>
                 </div>
 
-                <div className="card p-4 flex items-center space-x-4 border border-border shadow-sm">
+                {/* Overdue Issues */}
+                <div
+                  className="card"
+                  style={{
+                    padding: '1.15rem 1.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    borderColor: (summary?.overdueIssues || 0) > 0 ? 'rgba(244, 63, 94, 0.35)' : undefined,
+                  }}
+                >
                   <div
-                    className={`p-3 rounded-lg ${
-                      (summary?.overdueIssues || 0) > 0
-                        ? 'bg-destructive/10 text-destructive'
-                        : 'bg-slate-500/10 text-slate-400'
-                    }`}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 'var(--radius-md)',
+                      background: (summary?.overdueIssues || 0) > 0 ? 'rgba(244, 63, 94, 0.15)' : 'rgba(148, 163, 184, 0.1)',
+                      color: (summary?.overdueIssues || 0) > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
                   >
-                    <AlertTriangle size={24} />
+                    <AlertTriangle size={22} />
                   </div>
                   <div>
-                    <span className="text-xs text-secondary font-medium uppercase tracking-wider">
+                    <span className="text-xs text-secondary font-medium" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Overdue Issues
                     </span>
                     <h3
-                      className={`text-2xl font-bold ${
-                        (summary?.overdueIssues || 0) > 0 ? 'text-destructive' : 'text-foreground'
-                      }`}
+                      style={{
+                        fontSize: '1.65rem',
+                        fontWeight: 700,
+                        color: (summary?.overdueIssues || 0) > 0 ? 'var(--color-danger)' : 'var(--color-text-main)',
+                        lineHeight: 1.2,
+                      }}
                     >
                       {summary?.overdueIssues || 0}
                     </h3>
                   </div>
                 </div>
 
-                <div className="card p-4 flex items-center space-x-4 border border-border shadow-sm">
-                  <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-lg">
-                    <CheckCircle2 size={24} />
+                {/* Completion Rate */}
+                <div
+                  className="card"
+                  style={{
+                    padding: '1.15rem 1.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 'var(--radius-md)',
+                      background: 'rgba(16, 185, 129, 0.12)',
+                      color: 'var(--color-success)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <CheckCircle2 size={22} />
                   </div>
                   <div>
-                    <span className="text-xs text-secondary font-medium uppercase tracking-wider">
+                    <span className="text-xs text-secondary font-medium" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       Done Rate
                     </span>
-                    <h3 className="text-2xl font-bold text-foreground">{completionPercentage}%</h3>
+                    <h3 style={{ fontSize: '1.65rem', fontWeight: 700, color: 'var(--color-text-main)', lineHeight: 1.2 }}>
+                      {completionPercentage}%
+                    </h3>
                   </div>
                 </div>
               </div>
 
-              {/* Status Breakdown & Priority Breakdown */}
+              {/* Status Breakdown & Priority Distribution */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Status Breakdown Card */}
-                <div className="card p-5 border border-border shadow-sm">
-                  <h3 className="text-base font-semibold text-foreground mb-4 flex items-center space-x-2">
-                    <TrendingUp size={18} className="text-primary" />
-                    <span>Status Breakdown</span>
-                  </h3>
+                <div className="card" style={{ padding: '1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <TrendingUp size={16} style={{ color: 'var(--color-primary-base)' }} />
+                      <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                        Status Distribution
+                      </h3>
+                    </div>
+                    <span className="text-xs text-secondary font-mono">{totalCount} total</span>
+                  </div>
 
-                  <div className="space-y-3">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                    {/* To Do */}
                     <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-secondary">To Do</span>
-                        <span className="font-semibold">{summary?.statusBreakdown?.TODO || 0}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.3rem' }}>
+                        <span style={{ color: '#38bdf8', fontWeight: 500 }}>To Do</span>
+                        <span className="font-mono text-secondary">{todoCount}</span>
                       </div>
-                      <div className="w-full bg-muted rounded-full h-2">
+                      <div style={{ width: '100%', height: 6, background: 'var(--bg-surface-2)', borderRadius: 9999, overflow: 'hidden' }}>
                         <div
-                          className="bg-slate-400 h-2 rounded-full"
                           style={{
-                            width: `${
-                              totalCount > 0 ? ((summary?.statusBreakdown?.TODO || 0) / totalCount) * 100 : 0
-                            }%`,
+                            width: `${totalCount > 0 ? (todoCount / totalCount) * 100 : 0}%`,
+                            height: '100%',
+                            background: '#38bdf8',
+                            borderRadius: 9999,
+                            transition: 'width 0.4s ease',
                           }}
-                        ></div>
+                        />
                       </div>
                     </div>
 
+                    {/* In Progress */}
                     <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-secondary">In Progress</span>
-                        <span className="font-semibold">{summary?.statusBreakdown?.IN_PROGRESS || 0}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.3rem' }}>
+                        <span style={{ color: '#f59e0b', fontWeight: 500 }}>In Progress</span>
+                        <span className="font-mono text-secondary">{inProgressCount}</span>
                       </div>
-                      <div className="w-full bg-muted rounded-full h-2">
+                      <div style={{ width: '100%', height: 6, background: 'var(--bg-surface-2)', borderRadius: 9999, overflow: 'hidden' }}>
                         <div
-                          className="bg-blue-500 h-2 rounded-full"
                           style={{
-                            width: `${
-                              totalCount > 0
-                                ? ((summary?.statusBreakdown?.IN_PROGRESS || 0) / totalCount) * 100
-                                : 0
-                            }%`,
+                            width: `${totalCount > 0 ? (inProgressCount / totalCount) * 100 : 0}%`,
+                            height: '100%',
+                            background: '#f59e0b',
+                            borderRadius: 9999,
+                            transition: 'width 0.4s ease',
                           }}
-                        ></div>
+                        />
                       </div>
                     </div>
 
+                    {/* In Review */}
                     <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-secondary">In Review</span>
-                        <span className="font-semibold">{summary?.statusBreakdown?.IN_REVIEW || 0}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.3rem' }}>
+                        <span style={{ color: '#a855f7', fontWeight: 500 }}>In Review</span>
+                        <span className="font-mono text-secondary">{inReviewCount}</span>
                       </div>
-                      <div className="w-full bg-muted rounded-full h-2">
+                      <div style={{ width: '100%', height: 6, background: 'var(--bg-surface-2)', borderRadius: 9999, overflow: 'hidden' }}>
                         <div
-                          className="bg-amber-500 h-2 rounded-full"
                           style={{
-                            width: `${
-                              totalCount > 0
-                                ? ((summary?.statusBreakdown?.IN_REVIEW || 0) / totalCount) * 100
-                                : 0
-                            }%`,
+                            width: `${totalCount > 0 ? (inReviewCount / totalCount) * 100 : 0}%`,
+                            height: '100%',
+                            background: '#a855f7',
+                            borderRadius: 9999,
+                            transition: 'width 0.4s ease',
                           }}
-                        ></div>
+                        />
                       </div>
                     </div>
 
+                    {/* Done */}
                     <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-secondary">Done</span>
-                        <span className="font-semibold">{summary?.statusBreakdown?.DONE || 0}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.3rem' }}>
+                        <span style={{ color: '#10b981', fontWeight: 500 }}>Done</span>
+                        <span className="font-mono text-secondary">{doneCount}</span>
                       </div>
-                      <div className="w-full bg-muted rounded-full h-2">
+                      <div style={{ width: '100%', height: 6, background: 'var(--bg-surface-2)', borderRadius: 9999, overflow: 'hidden' }}>
                         <div
-                          className="bg-emerald-500 h-2 rounded-full"
                           style={{
-                            width: `${
-                              totalCount > 0 ? ((summary?.statusBreakdown?.DONE || 0) / totalCount) * 100 : 0
-                            }%`,
+                            width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%`,
+                            height: '100%',
+                            background: '#10b981',
+                            borderRadius: 9999,
+                            transition: 'width 0.4s ease',
                           }}
-                        ></div>
+                        />
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Priority Breakdown Card */}
-                <div className="card p-5 border border-border shadow-sm">
-                  <h3 className="text-base font-semibold text-foreground mb-4 flex items-center space-x-2">
-                    <AlertTriangle size={18} className="text-primary" />
-                    <span>Priority Distribution</span>
-                  </h3>
+                <div className="card" style={{ padding: '1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <AlertTriangle size={16} style={{ color: 'var(--color-primary-base)' }} />
+                      <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                        Priority Breakdown
+                      </h3>
+                    </div>
+                  </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/20">
-                      <span className="text-xs text-red-500 font-semibold uppercase">Urgent</span>
-                      <p className="text-xl font-bold text-red-500">
+                    <div
+                      style={{
+                        padding: '0.85rem',
+                        background: 'rgba(244, 63, 94, 0.08)',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid rgba(244, 63, 94, 0.2)',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.72rem', color: '#fb7185', fontWeight: 600, textTransform: 'uppercase' }}>
+                        Urgent
+                      </span>
+                      <p style={{ fontSize: '1.35rem', fontWeight: 700, color: '#fb7185', marginTop: '0.2rem' }}>
                         {summary?.priorityBreakdown?.URGENT || 0}
                       </p>
                     </div>
 
-                    <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                      <span className="text-xs text-amber-500 font-semibold uppercase">High</span>
-                      <p className="text-xl font-bold text-amber-500">
+                    <div
+                      style={{
+                        padding: '0.85rem',
+                        background: 'rgba(245, 158, 11, 0.08)',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid rgba(245, 158, 11, 0.2)',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 600, textTransform: 'uppercase' }}>
+                        High
+                      </span>
+                      <p style={{ fontSize: '1.35rem', fontWeight: 700, color: '#fbbf24', marginTop: '0.2rem' }}>
                         {summary?.priorityBreakdown?.HIGH || 0}
                       </p>
                     </div>
 
-                    <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                      <span className="text-xs text-blue-500 font-semibold uppercase">Medium</span>
-                      <p className="text-xl font-bold text-blue-500">
+                    <div
+                      style={{
+                        padding: '0.85rem',
+                        background: 'rgba(56, 189, 248, 0.08)',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid rgba(56, 189, 248, 0.2)',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.72rem', color: '#38bdf8', fontWeight: 600, textTransform: 'uppercase' }}>
+                        Medium
+                      </span>
+                      <p style={{ fontSize: '1.35rem', fontWeight: 700, color: '#38bdf8', marginTop: '0.2rem' }}>
                         {summary?.priorityBreakdown?.MEDIUM || 0}
                       </p>
                     </div>
 
-                    <div className="p-3 bg-slate-500/10 rounded-lg border border-slate-500/20">
-                      <span className="text-xs text-secondary font-semibold uppercase">Low</span>
-                      <p className="text-xl font-bold text-secondary">
+                    <div
+                      style={{
+                        padding: '0.85rem',
+                        background: 'rgba(148, 163, 184, 0.08)',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>
+                        Low
+                      </span>
+                      <p style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginTop: '0.2rem' }}>
                         {summary?.priorityBreakdown?.LOW || 0}
                       </p>
                     </div>
@@ -309,31 +483,47 @@ export const DashboardPage: React.FC = () => {
               {/* Workload & Activity Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Team Workload */}
-                <div className="card p-5 border border-border shadow-sm">
-                  <h3 className="text-base font-semibold text-foreground mb-4 flex items-center space-x-2">
-                    <UserCheck size={18} className="text-primary" />
-                    <span>Team Workload</span>
-                  </h3>
+                <div className="card" style={{ padding: '1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                    <UserCheck size={16} style={{ color: 'var(--color-primary-base)' }} />
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                      Team Workload
+                    </h3>
+                  </div>
 
                   {workload.length === 0 ? (
-                    <div className="py-8 text-center text-secondary text-sm">
-                      No assigned issues recorded.
+                    <div style={{ padding: '2.5rem 0', textAlign: 'center' }} className="text-secondary text-sm">
+                      No assigned issues in the selected scope.
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                       {workload.map((w) => (
                         <div
                           key={w.userId}
-                          className="p-3 rounded-lg bg-card/80 border border-border flex items-center justify-between"
+                          style={{
+                            padding: '0.75rem 0.9rem',
+                            borderRadius: 'var(--radius-md)',
+                            background: 'var(--bg-surface-2)',
+                            border: '1px solid var(--border-subtle)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
                         >
-                          <div>
-                            <h4 className="text-sm font-semibold text-foreground">{w.name}</h4>
-                            <span className="text-xs text-secondary">{w.email}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <Avatar name={w.name} email={w.email} size="sm" />
+                            <div>
+                              <h4 style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                                {w.name}
+                              </h4>
+                              <span style={{ fontSize: '0.72rem' }} className="text-secondary">{w.email}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-3 text-xs">
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem' }}>
                             <span className="badge badge-subtle">{w.openCount} Open</span>
-                            <span className="badge badge-success">{w.doneCount} Done</span>
-                            <span className="font-mono font-bold text-foreground">
+                            <span className="badge badge-done">{w.doneCount} Done</span>
+                            <span className="badge-code font-mono" style={{ fontSize: '0.72rem' }}>
                               {w.totalAssigned} Total
                             </span>
                           </div>
@@ -344,26 +534,38 @@ export const DashboardPage: React.FC = () => {
                 </div>
 
                 {/* Recent Activity Feed */}
-                <div className="card p-5 border border-border shadow-sm">
-                  <h3 className="text-base font-semibold text-foreground mb-4 flex items-center space-x-2">
-                    <Activity size={18} className="text-primary" />
-                    <span>Recent Activity</span>
-                  </h3>
+                <div className="card" style={{ padding: '1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                    <Activity size={16} style={{ color: 'var(--color-primary-base)' }} />
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                      Recent Workspace Activity
+                    </h3>
+                  </div>
 
                   {recentActivity.length === 0 ? (
-                    <div className="py-8 text-center text-secondary text-sm">
+                    <div style={{ padding: '2.5rem 0', textAlign: 'center' }} className="text-secondary text-sm">
                       No recent activity recorded.
                     </div>
                   ) : (
-                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 340, overflowY: 'auto' }}>
                       {recentActivity.map((act) => (
                         <div
                           key={act.id}
-                          className="p-2.5 rounded bg-card/80 border border-border flex flex-col space-y-1 text-xs"
+                          style={{
+                            padding: '0.65rem 0.8rem',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'var(--bg-surface-2)',
+                            border: '1px solid var(--border-subtle)',
+                            fontSize: '0.78rem',
+                          }}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-foreground">{act.actor.name}</span>
-                            <span className="text-secondary">
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <Avatar name={act.actor.name} email={act.actor.email} size="xs" />
+                              <span style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>{act.actor.name}</span>
+                            </div>
+                            <span className="text-xs text-muted" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <Clock size={11} />
                               {new Date(act.createdAt).toLocaleString(undefined, {
                                 month: 'short',
                                 day: 'numeric',
@@ -372,11 +574,14 @@ export const DashboardPage: React.FC = () => {
                               })}
                             </span>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <span className="badge badge-primary font-mono text-[10px]">
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span className="badge-code font-mono" style={{ fontSize: '0.72rem' }}>
                               {act.issueKey}
                             </span>
-                            <span className="text-foreground truncate">{act.details}</span>
+                            <span className="truncate" style={{ color: 'var(--color-text-secondary)', flex: 1 }}>
+                              {act.details}
+                            </span>
                           </div>
                         </div>
                       ))}
@@ -385,16 +590,30 @@ export const DashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Quick Navigation to Projects */}
-              <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 flex items-center justify-between">
+              {/* Quick Navigation to Workspaces */}
+              <div
+                style={{
+                  padding: '1rem 1.25rem',
+                  borderRadius: 'var(--radius-lg)',
+                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(129, 140, 248, 0.03) 100%)',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                }}
+              >
                 <div>
-                  <h4 className="font-semibold text-sm text-foreground">Explore Projects & Issues</h4>
+                  <h4 style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                    Ready to work on sprint issues?
+                  </h4>
                   <p className="text-xs text-secondary">
-                    View full project boards, issue queues, and team permissions.
+                    Jump into Kanban boards, manage sprints, and assign team tasks.
                   </p>
                 </div>
                 <Link to="/projects" className="btn btn-sm btn-primary">
-                  View Projects <ArrowRight size={14} className="ml-1" />
+                  Explore Workspaces <ArrowRight size={14} />
                 </Link>
               </div>
             </>
