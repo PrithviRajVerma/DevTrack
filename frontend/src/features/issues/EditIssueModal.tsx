@@ -127,8 +127,8 @@ export const EditIssueModal: React.FC<Props> = ({
         <div className="modal-header">
           <div>
             <div className="modal-badge-row">
-              <span className="badge badge-primary font-mono">{currentIssue.key}</span>
-              <span className="badge badge-subtle">Version {currentIssue.version}</span>
+              <span className="badge-code font-mono">{currentIssue.key}</span>
+              <span className="badge badge-subtle">v{currentIssue.version}</span>
             </div>
             <h2 className="modal-title">Issue Details</h2>
           </div>
@@ -138,7 +138,7 @@ export const EditIssueModal: React.FC<Props> = ({
         </div>
 
         {/* Tab navigation */}
-        <div className="flex border-b border-border mb-4">
+        <div className="flex border-b border-border mb-4 overflow-x-auto">
           <button
             type="button"
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center space-x-2 ${
