@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, Trash2, AlertCircle, Shield, User as UserIcon } from 'lucide-react';
+import { X, UserPlus, Trash2, AlertCircle, Shield } from 'lucide-react';
 import { addProjectMember, listProjectMembers, removeProjectMember } from '../../api/projects';
 import { Project, ProjectMember, ProjectRole } from '../../types/project';
 import { ApiException } from '../../api/client';
+import { Avatar } from '../../components/common/Avatar';
 
 interface Props {
   isOpen: boolean;
@@ -154,9 +155,7 @@ export const ManageMembersModal: React.FC<Props> = ({
               {members.map((member) => (
                 <li key={member.id} className="member-item">
                   <div className="member-info">
-                    <div className="member-avatar">
-                      <UserIcon size={16} />
-                    </div>
+                    <Avatar name={member.user.name} email={member.user.email} size="sm" />
                     <div>
                       <div className="member-name">{member.user.name}</div>
                       <div className="member-email">{member.user.email}</div>
