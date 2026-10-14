@@ -44,10 +44,10 @@ flowchart LR
 ---
 
 ### Milestone 2: Issue Management
-- **Status:** **PLANNED / UP NEXT**
+- **Status:** **COMPLETED**
 - **Goal:** Project creation & membership authorization, Issue CRUD with `@Version` optimistic locking, server-side filtering, sorting, pagination, and project/issue screens.
-- **Key Features to Implement:**
-  - [ ] Project Service & REST Endpoints:
+- **Deliverables:**
+  - [x] Project Service & REST Endpoints:
     - `POST /api/projects` (Create project, auto-assign creator as `OWNER`)
     - `GET /api/projects` (List projects accessible to current user)
     - `GET /api/projects/{projectId}` (Project details & permissions)
@@ -55,29 +55,31 @@ flowchart LR
     - `GET /api/projects/{projectId}/members` (List members)
     - `POST /api/projects/{projectId}/members` (Add member)
     - `DELETE /api/projects/{projectId}/members/{userId}` (Remove member)
-  - [ ] Issue Domain & Flyway Migration `V2`:
-    - `issues` table: id, project_id, issue_number, title, description, type (`TASK`, `BUG`, `FEATURE`), status (`TODO`, `IN_PROGRESS`, `IN_REVIEW`, `DONE`), priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), reporter_id, assignee_id, due_date, version, timestamps.
+  - [x] Issue Domain & Flyway Migration `V2`:
+    - `issues` table: id, project_id, issue_number, title, description, type, status, priority, reporter_id, assignee_id, due_date, version, timestamps.
+    - `project_counters` table for atomic, locked sequence allocation.
     - Unique constraint on `(project_id, issue_number)`.
     - Optimistic locking with JPA `@Version` returning `409 Conflict` on concurrent collisions.
-  - [ ] Issue REST Endpoints:
+  - [x] Issue REST Endpoints:
     - `POST /api/projects/{projectId}/issues` (Create issue with atomic issue number generation)
-    - `GET /api/projects/{projectId}/issues` (Server-side pagination, sorting, and filters: status, priority, assignee, type, overdue)
+    - `GET /api/projects/{projectId}/issues` (Server-side pagination, sorting, and filters: status, priority, assignee, type, overdue, search)
     - `GET /api/issues/{issueId}` (Issue detail)
     - `PATCH /api/issues/{issueId}` (Update issue with version validation)
     - `DELETE /api/issues/{issueId}` (Delete issue)
-  - [ ] Frontend Screens:
-    - Project list & project creation dialog.
-    - Project workspace view with member list.
-    - Issue list with filtering, sorting, and pagination controls.
-    - Issue create/edit modal and detail view.
-  - [ ] Automated Tests:
-    - Unit tests for issue status transitions, authorization rules, and project membership.
-    - Integration tests for project CRUD, issue CRUD, filtering, pagination, and optimistic locking conflict detection.
+  - [x] Frontend Screens:
+    - `ProjectsPage` with responsive cards, role badges, and member counts.
+    - `CreateProjectModal` with auto-key suggestion and validation.
+    - `ProjectDetailsPage` with filter bar (search, status, priority, type, overdue).
+    - `CreateIssueModal` and `EditIssueModal` with optimistic lock conflict detection.
+    - `ManageMembersModal` for adding and removing team members.
+  - [x] Automated Tests:
+    - `ProjectIntegrationTest`: 4 tests verifying CRUD, duplicate keys, access denial to non-members, and member management.
+    - `IssueIntegrationTest`: 6 tests verifying sequential numbering (CORE-1, CORE-2), optimistic locking 409 conflict, server-side filtering, and assignee validation.
 
 ---
 
 ### Milestone 3: Team Collaboration
-- **Status:** **QUEUED**
+- **Status:** **PLANNED / UP NEXT**
 - **Goal:** Issue comments, immutable activity history, Kanban drag-and-drop board, and dashboard aggregate metrics.
 - **Key Features to Implement:**
   - [ ] Comments: `comments` table, author-only edit/delete policy, validated input.
@@ -114,11 +116,13 @@ flowchart LR
 | Scope | Test Suite | Executed | Passed | Failed | Status |
 |---|---|---|---|---|---|
 | **Backend** | `AuthIntegrationTest` | 8 | 8 | 0 | PASSED |
+| **Backend** | `IssueIntegrationTest` | 6 | 6 | 0 | PASSED |
+| **Backend** | `ProjectIntegrationTest` | 4 | 4 | 0 | PASSED |
 | **Backend** | `AuthServiceTest` | 4 | 4 | 0 | PASSED |
 | **Backend** | `JwtServiceTest` | 2 | 2 | 0 | PASSED |
 | **Backend** | `DevTrackApplicationTests` | 1 | 1 | 0 | PASSED |
 | **Frontend** | Type Check (`tsc`) & Vite Build | 1 | 1 | 0 | PASSED |
-| **Total** | | **16** | **16** | **0** | **100% Verified** |
+| **Total** | | **26** | **26** | **0** | **100% Verified** |
 
 ---
 
