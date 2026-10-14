@@ -15,4 +15,7 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Lo
     boolean existsByProjectIdAndUserId(Long projectId, Long userId);
     long countByProjectId(Long projectId);
     void deleteByProjectIdAndUserId(Long projectId, Long userId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT pm.project.id FROM ProjectMember pm WHERE pm.user.id = :userId")
+    List<Long> findProjectIdsByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 }
