@@ -3,6 +3,7 @@ import { MessageSquare, Send, Trash2, Edit2, X, Check, AlertCircle } from 'lucid
 import { commentsApi } from '../../api/comments';
 import { Comment } from '../../types/comment';
 import { useAuth } from '../auth/AuthContext';
+import { Avatar } from '../../components/common/Avatar';
 
 interface Props {
   issueId: number;
@@ -124,6 +125,7 @@ export const CommentsSection: React.FC<Props> = ({ issueId, isProjectOwner = fal
               <div key={comment.id} className="comment-card p-3 rounded border border-border bg-card">
                 <div className="comment-header flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
+                    <Avatar name={comment.author.name} email={comment.author.email} size="xs" />
                     <span className="font-semibold text-sm">{comment.author.name}</span>
                     <span className="text-xs text-secondary">
                       {new Date(comment.createdAt).toLocaleString(undefined, {

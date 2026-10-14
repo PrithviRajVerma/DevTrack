@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { activityApi } from '../../api/activity';
 import { ActivityEvent, ActivityEventType } from '../../types/activity';
+import { Avatar } from '../../components/common/Avatar';
 
 interface Props {
   issueId: number;
@@ -87,6 +88,7 @@ export const ActivityTimeline: React.FC<Props> = ({ issueId }) => {
 
           <div className="activity-content">
             <div className="flex items-center space-x-2 text-xs text-secondary mb-1">
+              <Avatar name={event.actor.name} email={event.actor.email} size="xs" />
               <span className="font-semibold text-foreground">{event.actor.name}</span>
               <span>•</span>
               <span>

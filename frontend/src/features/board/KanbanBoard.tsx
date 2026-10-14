@@ -12,6 +12,7 @@ import {
 import { Issue, IssueStatus, IssuePriority } from '../../types/issue';
 import { updateIssue } from '../../api/issues';
 import { ApiException } from '../../api/client';
+import { Avatar } from '../../components/common/Avatar';
 
 interface Props {
   issues: Issue[];
@@ -125,15 +126,6 @@ export const KanbanBoard: React.FC<Props> = ({
     }
   };
 
-  const getAssigneeInitials = (name?: string) => {
-    if (!name) return '—';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
-  };
-
   return (
     <div className="kanban-board-wrapper">
       {boardError && (
@@ -243,13 +235,7 @@ export const KanbanBoard: React.FC<Props> = ({
 
                           <div className="flex items-center gap-2">
                             {issue.assignee ? (
-                              <div
-                                className="user-avatar"
-                                style={{ width: 22, height: 22, fontSize: '0.65rem' }}
-                                title={`Assignee: ${issue.assignee.name}`}
-                              >
-                                {getAssigneeInitials(issue.assignee.name)}
-                              </div>
+                              <Avatar name={issue.assignee.name} email={issue.assignee.email} size="xs" />
                             ) : (
                               <span
                                 className="text-xs text-muted"

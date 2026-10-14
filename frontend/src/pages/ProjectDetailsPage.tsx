@@ -23,6 +23,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { ApiException } from '../api/client';
+import { Avatar } from '../components/common/Avatar';
 
 export const ProjectDetailsPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -118,13 +119,6 @@ export const ProjectDetailsPage: React.FC = () => {
       if (err instanceof ApiException) alert(`Failed to delete issue: ${err.message}`);
       else alert('Failed to delete issue.');
     }
-  };
-
-  const getAssigneeInitials = (name?: string) => {
-    if (!name) return '—';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-    return name.slice(0, 2).toUpperCase();
   };
 
   if (isLoadingProject) {
@@ -374,12 +368,7 @@ export const ProjectDetailsPage: React.FC = () => {
                         <td>
                           {issue.assignee ? (
                             <div className="flex items-center gap-2">
-                              <div
-                                className="user-avatar"
-                                style={{ width: 22, height: 22, fontSize: '0.65rem' }}
-                              >
-                                {getAssigneeInitials(issue.assignee.name)}
-                              </div>
+                              <Avatar name={issue.assignee.name} email={issue.assignee.email} size="xs" />
                               <span className="text-xs text-secondary">{issue.assignee.name}</span>
                             </div>
                           ) : (
