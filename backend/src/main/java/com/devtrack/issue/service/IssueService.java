@@ -32,19 +32,22 @@ public class IssueService {
     private final ProjectService projectService;
     private final UserService userService;
     private final com.devtrack.activity.service.ActivityEventService activityEventService;
+    private final com.devtrack.outbox.service.OutboxEventService outboxEventService;
 
     public IssueService(
             IssueRepository issueRepository,
             ProjectCounterRepository projectCounterRepository,
             ProjectService projectService,
             UserService userService,
-            com.devtrack.activity.service.ActivityEventService activityEventService
+            com.devtrack.activity.service.ActivityEventService activityEventService,
+            com.devtrack.outbox.service.OutboxEventService outboxEventService
     ) {
         this.issueRepository = issueRepository;
         this.projectCounterRepository = projectCounterRepository;
         this.projectService = projectService;
         this.userService = userService;
         this.activityEventService = activityEventService;
+        this.outboxEventService = outboxEventService;
     }
 
     private User getCurrentUser() {
@@ -90,6 +93,21 @@ public class IssueService {
                 com.devtrack.activity.entity.ActivityEventType.ISSUE_CREATED,
                 "Created issue " + savedIssue.getKey() + ": " + savedIssue.getTitle()
         );
+
+        if (assignee != null && !assignee.getId().equals(currentUser.getId())) {
+            outboxEventService.publishEvent(
+                    "ISSUE",
+                    savedIssue.getId(),
+                    "ISSUE_ASSIGNED",
+                    new com.devtrack.outbox.dto.OutboxPayload(
+                            assignee.getId(),
+                            savedIssue.getId(),
+                            currentUser.getId(),
+                            com.devtrack.notification.entity.NotificationType.ISSUE_ASSIGNED,
+                            "You were assigned to " + savedIssue.getKey() + ": " + savedIssue.getTitle()
+                    )
+            );
+        }
 
         return IssueResponse.fromEntity(savedIssue);
     }
@@ -154,6 +172,21 @@ public class IssueService {
                     "Changed status from " + issue.getStatus() + " to " + request.getStatus()
             );
             issue.setStatus(request.getStatus());
+
+            if (issue.getAssignee() != null && !issue.getAssignee().getId().equals(currentUser.getId())) {
+                outboxEventService.publishEvent(
+                        "ISSUE",
+                        issue.getId(),
+                        "STATUS_CHANGED",
+                        new com.devtrack.outbox.dto.OutboxPayload(
+                                issue.getAssignee().getId(),
+                                issue.getId(),
+                                currentUser.getId(),
+                                com.devtrack.notification.entity.NotificationType.STATUS_CHANGED,
+                                "Status for " + issue.getKey() + " changed to " + request.getStatus()
+                        )
+                );
+            }
         }
         if (request.getPriority() != null && request.getPriority() != issue.getPriority()) {
             activityEventService.recordEvent(
@@ -189,6 +222,21 @@ public class IssueService {
                         "Assigned issue to " + newAssignee.getName()
                 );
                 issue.setAssignee(newAssignee);
+
+                if (!newAssignee.getId().equals(currentUser.getId())) {
+                    outboxEventService.publishEvent(
+                            "ISSUE",
+                            issue.getId(),
+                            "ISSUE_ASSIGNED",
+                            new com.devtrack.outbox.dto.OutboxPayload(
+                                    newAssignee.getId(),
+                                    issue.getId(),
+                                    currentUser.getId(),
+                                    com.devtrack.notification.entity.NotificationType.ISSUE_ASSIGNED,
+                                    "You were assigned to " + issue.getKey() + ": " + issue.getTitle()
+                            )
+                    );
+                }
             }
         }
 

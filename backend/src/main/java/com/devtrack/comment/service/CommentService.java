@@ -32,6 +32,7 @@ public class CommentService {
     private final ProjectMemberRepository projectMemberRepository;
     private final UserService userService;
     private final ActivityEventService activityEventService;
+    private final com.devtrack.outbox.service.OutboxEventService outboxEventService;
 
     public CommentService(
             CommentRepository commentRepository,
@@ -39,7 +40,8 @@ public class CommentService {
             ProjectService projectService,
             ProjectMemberRepository projectMemberRepository,
             UserService userService,
-            ActivityEventService activityEventService
+            ActivityEventService activityEventService,
+            com.devtrack.outbox.service.OutboxEventService outboxEventService
     ) {
         this.commentRepository = commentRepository;
         this.issueRepository = issueRepository;
@@ -47,6 +49,7 @@ public class CommentService {
         this.projectMemberRepository = projectMemberRepository;
         this.userService = userService;
         this.activityEventService = activityEventService;
+        this.outboxEventService = outboxEventService;
     }
 
     private User getCurrentUser() {
@@ -86,6 +89,21 @@ public class CommentService {
                 ActivityEventType.COMMENT_ADDED,
                 "Added comment: \"" + snippet + "\""
         );
+
+        if (issue.getAssignee() != null && !issue.getAssignee().getId().equals(currentUser.getId())) {
+            outboxEventService.publishEvent(
+                    "COMMENT",
+                    savedComment.getId(),
+                    "COMMENT_ADDED",
+                    new com.devtrack.outbox.dto.OutboxPayload(
+                            issue.getAssignee().getId(),
+                            issue.getId(),
+                            currentUser.getId(),
+                            com.devtrack.notification.entity.NotificationType.COMMENT_ADDED,
+                            currentUser.getName() + " commented on " + issue.getKey() + ": \"" + snippet + "\""
+                    )
+            );
+        }
 
         return CommentResponse.fromEntity(savedComment);
     }
