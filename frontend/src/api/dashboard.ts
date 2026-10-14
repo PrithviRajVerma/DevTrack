@@ -4,21 +4,16 @@ import { ActivityEvent } from '../types/activity';
 
 export const dashboardApi = {
   getSummary: async (projectId?: number): Promise<DashboardSummary> => {
-    const params = projectId ? { projectId } : {};
-    const response = await apiClient.get<DashboardSummary>('/api/dashboard/summary', { params });
-    return response.data;
+    const query = projectId ? `?projectId=${projectId}` : '';
+    return apiClient<DashboardSummary>(`/dashboard/summary${query}`, { method: 'GET' });
   },
 
   getWorkload: async (projectId?: number): Promise<AssigneeWorkload[]> => {
-    const params = projectId ? { projectId } : {};
-    const response = await apiClient.get<AssigneeWorkload[]>('/api/dashboard/workload', { params });
-    return response.data;
+    const query = projectId ? `?projectId=${projectId}` : '';
+    return apiClient<AssigneeWorkload[]>(`/dashboard/workload${query}`, { method: 'GET' });
   },
 
   getRecentActivity: async (limit: number = 15): Promise<ActivityEvent[]> => {
-    const response = await apiClient.get<ActivityEvent[]>('/api/dashboard/recent-activity', {
-      params: { limit },
-    });
-    return response.data;
+    return apiClient<ActivityEvent[]>(`/dashboard/recent-activity?limit=${limit}`, { method: 'GET' });
   },
 };
