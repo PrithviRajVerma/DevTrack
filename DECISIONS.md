@@ -15,6 +15,8 @@ This document records key architectural, engineering, and product decisions made
 | [ADR-005](#adr-005-optimistic-locking-via-jpa-version-for-issue-updates) | Optimistic Locking via JPA `@Version` for Issue Updates | 2026-10-14 | Accepted | Concurrency |
 | [ADR-006](#adr-006-atomic-project-scoped-issue-number-allocation) | Atomic Project-Scoped Issue Number Allocation | 2026-10-14 | Accepted | Concurrency / Database |
 | [ADR-007](#adr-007-native-postgresql-upsert-returning-for-atomic-counters) | Native PostgreSQL Upsert with RETURNING for Sequence Counters | 2026-10-14 | Accepted | Performance / DB |
+| [ADR-008](#adr-008-append-only-activity-audit-trail-with-mandatory-transaction-propagation) | Append-Only Activity Audit Trail with Mandatory Transaction Propagation | 2026-10-14 | Accepted | Architecture / Audit |
+| [ADR-009](#adr-009-server-side-database-aggregation-for-analytics-dashboard) | Server-Side Database Aggregation for Analytics Dashboard | 2026-10-14 | Accepted | Performance / API |
 
 ---
 
@@ -101,3 +103,26 @@ This document records key architectural, engineering, and product decisions made
   - Zero ORM dirty-checking or merge-state overhead.
   - Guaranteed monotonically increasing, unique issue keys per project under concurrent threads.
 - **Consequences:** Relies on PostgreSQL-specific dialect features, which matches the project specification.
+
+---
+
+### ADR-008: Append-Only Activity Audit Trail with Mandatory Transaction Propagation
+- **Context:** Traceability requires tracking who performed mutations on issues (creation, status change, priority changes, reassignment, and comments) without corrupting history or allowing audit events to be written if the primary entity operation rolls back.
+- **Decision:** Model `activity_events` as an append-only table without update or delete endpoints. Service recording methods enforce `@Transactional(propagation = Propagation.MANDATORY)`.
+- **Rationale:**
+  - Guarantees that audit records only commit if the underlying business transaction succeeds.
+  - Prevents orphan audit entries on rollbacks and ensures atomic consistency.
+  - Append-only design eliminates audit tampering risks.
+- **Consequences:** All callers of `activityEventService.recordEvent` must already be executing within an active transactional context.
+
+---
+
+### ADR-009: Server-Side Database Aggregation for Analytics Dashboard
+- **Context:** The team dashboard requires issue totals, status breakdown, open assigned issues, overdue issues, and per-assignee workload breakdown. Fetching all issues to calculate counts in the browser would create massive bandwidth and memory waste as the dataset grows.
+- **Decision:** Implement dedicated JPQL aggregation queries (`GROUP BY i.status`, `GROUP BY i.priority`, `GROUP BY i.assignee`, `SUM(CASE WHEN ... THEN 1 ELSE 0)`) in `IssueRepository` scoped strictly to the list of project IDs the current authenticated user belongs to.
+- **Rationale:**
+  - Moves computation to PostgreSQL which optimizes aggregate operations with index scans.
+  - Eliminates over-fetching; the dashboard endpoint transfers small summarized JSON payloads instead of hundreds or thousands of issue entities.
+  - Enforces project boundary security directly within the query predicate (`WHERE i.project.id IN :projectIds`).
+- **Consequences:** Aggregate endpoints cannot be served directly from client caches without invalidation upon issue mutations. TanStack Query cache tags manage this effectively.
+
